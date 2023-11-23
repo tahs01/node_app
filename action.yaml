@@ -1,0 +1,96 @@
+
+name: Basic CI/CD ( Pipeline )
+
+# env:
+#   DOCKER_USERNAME: ieielil #DockerUsername
+#   DOCKER_PASSWORD: '' #DockerPassword
+#   IMAGE: hc-ci-cd
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # - name: Determine Version
+      #   id: semver
+      #   run: |
+      #     git config --global user.email "kcithu.96@gmail.com"
+      #     git config --global user.name "dev-kst-hc"
+      #     github_token="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"
+      #     git remote set-url origin https://dev-kst-hc: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@github.com/dev-kst-hc/simple-webapp-docker.git
+      #     currentVersion="0.0.0"
+      #     commitMessage=$(git log -1 --pretty=%B)
+      #     echo "Commit Message: $commitMessage"
+
+#           if [[ $commitMessage =~ ^minor: ]]; then
+#              currentVersion=$(npm version mvagrant@HelloCloud-Boxes:~/miniproject3/release-example-voting-app$ git remote rm origin
+# vagrant@HelloCloud-Boxes:~/miniproject3/release-example-voting-app$ git remote -vinor)
+#              echo "Incrementing minor version."
+#           elif [[ $commitMessage =~ ^patch: ]]; then
+#              currentVersion=$(npm version patch)
+#              echo "Incrementing patch version."
+#           elif [[ $commitMessage =~ ^major: ]]; then
+#              currentVersion=$(npm version major)
+#              echo "Incrementing major version."
+#           fi
+
+#           echo "Current Version: $currentVersion"
+#           echo "::set-output name=new_tag::$currentVersion"
+#           git add package.json
+#           git commit -m "Bump version to package.json" --allow-empty
+#           git push origin main
+
+      # - name: Create Git Tag
+      #   #run: git tag -a ${{ steps.semver.outputs.new_tag }} -m "Incremented tag to ${{ steps.increment_tag.outputs.new_tag }}"
+      #   run: git push origin ${{ steps.semver.outputs.new_tag }}
+      #     #env:
+      #     #GITHUB_TOKEN: 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
+
+
+      - name: Build Docker image ( hc-ci-cd:latest ) #Image Name that you created in docker
+        run: |
+          docker build -t docker-101:latest .
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          docker image tag doceker-101:latest tahs01/todoapp:latest
+          docker push tahs01/todoapp:latest
+
+
+      - name: Install eksctl
+        run: |
+          ARCH=amd64
+          PLATFORM=$(uname -s)_$ARCH
+          curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$PLATFORM.tar.gz"
+          # (Optional) Verify checksum
+          #curl -sL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_checksums.txt" | grep $PLATFORM | sha256sum --check
+          tar -xzf eksctl_$PLATFORM.tar.gz -C /tmp && rm eksctl_$PLATFORM.tar.gz
+          sudo mv /tmp/eksctl /usr/local/bin
+
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} #Replace with your access key id
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }} #Replace with your access key
+          aws configure set default.region ap-southeast-2 # Set your AWS region
+        env:
+         AWS_DEFAULT_REGION: ap-southeast-2
+
+      - name: Create EKS Cluster
+        run: |
+          eksctl create cluster --name=eks-todoapp --nodes=1 --kubeconfig=./ --region=ap-southeast-2 --profile=thanhtikesoe-noc
+
+
+      - name: Authenticate with EKS ( Authentication to eks cluster )
+        run: aws eks update-kubeconfig --name eks-test
+
+      - name: Deploy to EKS ( Deploying simple python app )
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl get nodes -o wide
